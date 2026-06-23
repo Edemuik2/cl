@@ -25,7 +25,6 @@ workflows:
           '
       - name: Build Unsigned IPA
         script: |
-          # Собираем проект, жестко указав папку для сохранения сборки (SYMROOT)
           xcodebuild build \
             -project lama-cleaner-ios.xcodeproj \
             -scheme lama-cleaner-ios \
@@ -38,9 +37,9 @@ workflows:
             PROVISIONING_PROFILE_SPECIFIER="" \
             clean build
             
-          # Формируем структуру .ipa из гарантированного места
+          # Формируем структуру .ipa динамически по расширению *.app
           mkdir -p Payload
-          mv build/Release-iphoneos/lama-cleaner-ios.app Payload/
+          mv build/Release-iphoneos/*.app Payload/
           zip -r lama-cleaner-ios.ipa Payload
           
     artifacts:
