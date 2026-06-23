@@ -1,0 +1,51 @@
+workflows:
+  ios-build:
+    name: iOS Sideload Build
+    max_build_duration: 60
+    environment:
+      xcode: latest
+    scripts:
+      - name: Unzip and Link Model
+        script: |
+          # 1. Распаковываем ZIP-архив с моделью в корень проекта
+          unzip -o LaMa.mlpackage.zip -d .
+          
+          # 2. Устанавливаем инструмент для редактирования файла проекта Xcode
+          gem install xcodeproj
+          
+          # 3. Программно делаем "Drag and Drop" распакованной модели в Xcode
+          ruby -e '
+            require "xcodeproj"
+            project_path = "lama-cleaner-ios.xcodeproj"
+            project = Xcodeproj::Project.open(project_path)
+            target = project.targets.first
+            file_ref = project.main_group.new_file("LaMa.mlpackage")
+            unless target.resources_build_phase.files.any? { |f| f.file_ref && f.file_ref.path == "LaMa.mlpackage" }
+              target.resources_build_phase.add_file_reference(file_ref)
+              project.save
+              puts "Модель успешно интегрирована в структуру Xcode!"
+            else
+              puts "Модель уже была добавлена ранее."
+            end
+          '
+      - name: Build Unsigned IPA
+        script: |
+          # Собираем чистый .app без подписей Apple Developer
+          xcodebuild build \
+            -project lama-cleaner-ios.xcodeproj \
+            -scheme lama-cleaner-ios \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            -sdk iphoneos \
+            clean build
+            
+          # Формируем стандартную структуру .ipa для сайдлоада
+          mkdir -p Payload
+          mv build/Release-iphoneos/lama-cleaner-ios.app Payload/
+          zip -r lama-cleaner-ios.ipa Payload
+          
+    artifacts:
+      - lama-cleaner-ios.ipa
